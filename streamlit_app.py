@@ -1,10 +1,10 @@
 import streamlit as st
 import cv2
 import numpy as np
-import base64
 import zipfile
 import os
 from PIL import Image
+import io
 
 # Function to resize the image
 def resize_image(image, scale_percent):
@@ -36,22 +36,15 @@ def download_edited_image(cropped, image_info):
     # Convert numpy array to PIL image
     pil_image = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
 
-    # Save PIL image to temporary file
-    tmp_file = "edited_image.png"
-    pil_image.save(tmp_file, quality=95)  # Adjust quality as needed
+    # Save PIL image to byte buffer
+    byte_buffer = io.BytesIO()
+    pil_image.save(byte_buffer, format='PNG')
+    byte_buffer.seek(0)
 
     # Write image information to a text file
-    info_file_name = "image_info.txt"
-    with open(info_file_name, 'w') as f:
-        f.write(image_info)
+    info_file_content = image_info.encode()
 
-    # Create a zip file containing the image and its information text file
-    zip_file_name = "edited_image.zip"
-    with zipfile.ZipFile(zip_file_name, 'w') as zipf:
-        zipf.write(tmp_file, arcname="edited_image.png")
-        zipf.write(info_file_name, arcname="image_info.txt")
-
-    return zip_file_name
+    return byte_buffer, info_file_content
 
 # Main function
 def main():
@@ -87,12 +80,14 @@ def main():
 
         # Download button
         if st.button("Download Edited Image"):
-            zip_file_name = download_edited_image(cropped, image_info)
-            with open(zip_file_name, 'rb') as f:
-                data = f.read()
-                b64 = base64.b64encode(data).decode()
-                href = f'<a href="data:file/zip;base64,{b64}" download="{os.path.basename(zip_file_name)}">Click here to download</a>'
-                st.markdown(href, unsafe_allow_html=True)
+            byte_buffer, info_file_content = download_edited_image(cropped, image_info)
+            st.download_button(
+                label="Click here to download",
+                data=byte_buffer,
+                file_name="edited_image.zip",
+                mime="application/zip",
+                key="download_button"
+            )
 
 if __name__ == "__main__":
     main()
