@@ -81,13 +81,18 @@ def main():
         # Download button
         if st.button("Download Edited Image"):
             byte_buffer, info_file_content = download_edited_image(cropped, image_info)
-            st.download_button(
-                label="Click here to download",
-                data=byte_buffer,
-                file_name="edited_image.zip",
-                mime="application/zip",
-                key="download_button"
-            )
+            with io.BytesIO() as output:
+                with zipfile.ZipFile(output, 'w') as zipf:
+                    zipf.writestr("edited_image.png", byte_buffer.getvalue())
+                    zipf.writestr("image_info.txt", info_file_content)
+                output.seek(0)
+                st.download_button(
+                    label="Click here to download",
+                    data=output,
+                    file_name="edited_image.zip",
+                    mime="application/zip",
+                    key="download_button"
+                )
 
 if __name__ == "__main__":
     main()
