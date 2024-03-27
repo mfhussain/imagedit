@@ -1,1 +1,8 @@
 streamlit
+cv2
+numpy
+tempfile
+base64
+zipfile
+os
+PIL
