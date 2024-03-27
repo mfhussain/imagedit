@@ -1,8 +1,5 @@
 streamlit
 opencv-python-headless
 numpy
-tempfile
-base64
 zipfile
-os
 PIL
