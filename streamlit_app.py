@@ -1,14 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Mar 27 11:13:11 2024
-
-@author: fhussain
-"""
-
 import streamlit as st
 import cv2
 import numpy as np
-from tempfile import NamedTemporaryFile
 import base64
 import zipfile
 import os
@@ -32,19 +24,45 @@ def crop_image(image, x, y, w, h):
     cropped_image = image[y:y+h, x:x+w]
     return cropped_image
 
+# Function to process uploaded file
+def process_uploaded_file(uploaded_file):
+    # OpenCV memory optimization for large files
+    file_bytes = np.frombuffer(uploaded_file.read(), dtype=np.uint8)
+    original_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    return original_image
+
+# Function to download edited image
+def download_edited_image(cropped, image_info):
+    # Convert numpy array to PIL image
+    pil_image = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+
+    # Save PIL image to temporary file
+    tmp_file = "edited_image.png"
+    pil_image.save(tmp_file, quality=95)  # Adjust quality as needed
+
+    # Write image information to a text file
+    info_file_name = "image_info.txt"
+    with open(info_file_name, 'w') as f:
+        f.write(image_info)
+
+    # Create a zip file containing the image and its information text file
+    zip_file_name = "edited_image.zip"
+    with zipfile.ZipFile(zip_file_name, 'w') as zipf:
+        zipf.write(tmp_file, arcname="edited_image.png")
+        zipf.write(info_file_name, arcname="image_info.txt")
+
+    return zip_file_name
+
 # Main function
 def main():
     st.title("Image Editor")
 
-    uploaded_image = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"], key="uploaded_file")
 
     image_info = st.text_input("Image Information", "")
 
-    if uploaded_image is not None:
-        # OpenCV memory optimization for large files
-        file_bytes = np.frombuffer(uploaded_image.read(), dtype=np.uint8)
-        original_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
+    if uploaded_file is not None:
+        original_image = process_uploaded_file(uploaded_file)
         st.image(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB), caption="Original Image", use_column_width=True)
 
         # Image processing options
@@ -69,33 +87,12 @@ def main():
 
         # Download button
         if st.button("Download Edited Image"):
-            # Convert numpy array to PIL image
-            pil_image = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
-
-            # Save PIL image to temporary file
-            tmp_file = NamedTemporaryFile(delete=False, suffix=".png")
-            pil_image.save(tmp_file.name, quality=95)  # Adjust quality as needed
-
-            # Write image information to a text file
-            info_file = NamedTemporaryFile(delete=False, suffix=".txt")
-            with open(info_file.name, 'w') as f:
-                f.write(image_info)
-
-            # Create a zip file containing the image and its information text file
-            tmp_zip = NamedTemporaryFile(delete=False, suffix=".zip")
-            with zipfile.ZipFile(tmp_zip.name, 'w') as zipf:
-                zipf.write(tmp_file.name, arcname="edited_image.png")
-                zipf.write(info_file.name, arcname="image_info.txt")
-
-            # Provide download link for the zip file
-            st.markdown(get_binary_file_downloader_html(tmp_zip.name, 'Edited Image'), unsafe_allow_html=True)
-
-def get_binary_file_downloader_html(bin_file_path, file_label='File'):
-    with open(bin_file_path, 'rb') as f:
-        data = f.read()
-    bin_str = base64.b64encode(data).decode('utf-8')
-    href = f'<a href="data:file/zip;base64,{bin_str}" download="{os.path.basename(bin_file_path)}">{file_label}</a>'
-    return href
+            zip_file_name = download_edited_image(cropped, image_info)
+            with open(zip_file_name, 'rb') as f:
+                data = f.read()
+                b64 = base64.b64encode(data).decode()
+                href = f'<a href="data:file/zip;base64,{b64}" download="{os.path.basename(zip_file_name)}">Click here to download</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
